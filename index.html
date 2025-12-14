@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAROQUE_ARCHIVE</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>></text></svg>">
+
+<style>
+/* ====== BASIC VOID ====== */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #050805;
+  height: 100%;
+  font-family: "Courier New", monospace;
+  overflow: hidden;
+}
+
+/* ====== CRT CONTAINER ====== */
+#crt {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+  color: #66ff99;
+  text-shadow: 0 0 4px rgba(102,255,153,0.6);
+  filter: blur(0.3px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* curved screen illusion */
+#crt::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  border-radius: 30px;
+  pointer-events: none;
+  box-shadow: inset 0 0 80px rgba(0,0,0,0.8);
+  z-index: 10;
+}
+
+/* Custom scrollbar */
+#crt::-webkit-scrollbar {
+  width: 8px;
+}
+
+#crt::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.3);
+}
+
+#crt::-webkit-scrollbar-thumb {
+  background: #66ff99;
+  border-radius: 4px;
+}
+
+#crt::-webkit-scrollbar-thumb:hover {
+  background: #55ee88;
+}
+
+/* scanlines */
+#scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.15),
+    rgba(0,0,0,0.15) 1px,
+    rgba(0,0,0,0) 2px,
+    rgba(0,0,0,0) 4px
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ====== TERMINAL ====== */
+#output {
+  white-space: pre-wrap;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+#input-line {
+  display: flex;
+  position: sticky;
+  bottom: 0;
+  background: #050805;
+  padding: 5px 0;
+}
+
+#prompt {
+  margin-right: 5px;
+}
+
+#cursor {
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* hidden real input */
+#real-input {
+  position: absolute;
+  opacity: 0;
+}
+
+/* flicker */
+@keyframes flicker {
+  0% { opacity: 1; }
+  50% { opacity: 0.96; }
+  100% { opacity: 1; }
+}
+
+.flicker {
+  animation: flicker 0.15s;
+}
+</style>
+</head>
+
+<body>
+<div id="crt">
+  <div id="output"></div>
+  <div id="input-line">
+    <span id="prompt">&gt;</span>
+    <span id="typed"></span><span id="cursor">█</span>
+  </div>
+  <div id="scanlines"></div>
+</div>
+
+<input id="real-input" autofocus />
+
+<script>
+/* ====== DATA CORE (complete baroque archive) ====== */
+const DATA = {
+  "TALIANSKO": {
+    "CARAVAGGIO": {
+      bio: [
+        "Veľký barokový realista",
+        "Ľudia ako modely",
+        "Temnosvit - zobrazenie temnejších miestností, svetlo dopadá zo strany",
+        "Zátišia ako samostatný útvar",
+        "Teatrálna kompozícia - vie zobraziť široký dej dramatickou maľbou",
+        "Krása v obyčajných ľuďoch/veciach, telesnej bolesti"
+      ],
+      diela: [
+        "Košík s ovocím (1. zátišie baroku)",
+        "Chorý Bakchus (muž s hroznom)",
+        "Povolanie sv. Matúša (muž ohlasujúci dav pri stole)",
+        "Víťazný Amor (Chlapec-Anjel so šípmi v pravej ruke)",
+        "Sv. Matúš s anjelom (Anjel vznášajúci sa nad Svätým)"
+      ]
+    }
+  },
+
+  "FRANCUZSKO": {
+    "POUSSIN": {
+      bio: [
+        "Maliar antiky-mytológie",
+        "Vyvážená kompozícia + farebná harmónia",
+        "Používal voskové figúry"
+      ],
+      diela: [
+        "Orfeus a Euridika (Prírodný výjav, ľudia a les v popredí, mesti v pozadí)",
+        "Únos sabiniek (Dynamicky-chaotický obraz - Únos v popredí, boj v pozadí)"
+      ]
+    },
+    "LA_TOUR": {
+      bio: [
+        "Maliar ticha - nočných výjavov s umelým osvetlením",
+        "Chudý, Jednoduchý ľudia (1-2) ako modely"
+      ],
+      diela: [
+        "Tesár sv. Jozef (Starý pán uklonený, Dievča so sviečkou)",
+        "Zjavenie sa anjela sv. Jozefovi (Dievča vľavo, Starý pán vpravo - pri stole so sviečkou)"
+      ]
+    },
+    "LORRAIN": {
+      bio: [
+        "Krajinár, panoráma okrášlená svetlom",
+        "Východy/Západy slnka, prístavy s loďkami - obľúbené znaky jeho diel"
+      ],
+      diela: [
+        "Vylodenie Kleopatry v Tarze (Lode naľavo, dav miestnych ľudí a Kleopatry napravo)"
+      ]
+    }
+  },
+
+  "HOLANDSKO": {
+    "HALS": {
+      bio: [
+        "Individuálny a samostatný portrét",
+        "Zobrazoval jednoduchosť, radosť",
+        "Po čase zobrazoval melancholické (depresívne), psychologicky hlbšie výjavy"
+      ],
+      diela: [
+        "Správcovia mužského starobinca -- Regenti (Muži s klobúkmi v čiernom - v rade)",
+        "Správkyne ženského starobinca (Staršie panie v čiernych šatoch pri stole)",
+        "Veselý Pijan (Muž v žltom odeve, s klobúkom, držiaci pohár piva)"
+      ]
+    },
+    "REMBRANDT": {
+      bio: [
+        "Múdry maliar - zaoberal sa psychológiou do veľkej hĺbky",
+        "Obrovské maľby, ponechaných ~700 olejomalieb, 300 rytín, 1600 perokresieb",
+        "Zobrazoval utrpenie, komiku, akty a mýty, autoportréty, starobu",
+        "Obmedzená paleta farieb, šerosvit so silným účinkom",
+        "Ako keby bol v kreslených subjektoch zdroj svetla - vyžarovali"
+      ],
+      diela: [
+        "Hodina anatómie dr. Tulpa (Dav študentov - mužov, mrtvola muža na stole)",
+        "Nočná hliadka (dav mužov a žien// zbrane, hudobné nástroje, dlhé tyče)",
+        "Usmievajúca sa Saskia (Dáma s červeným klobúkom, bodové svetlo)",
+        "Návrat márnotratného syna (Chudý na kolenách pri Pánovi, nadprirodzený pokoj)"
+      ]
+    },
+    "VERMEER": {
+      bio: [
+        "Zobrazoval idealizovanú, príjemnú atmosféru meštianskych interiérov"
+      ],
+      diela: [
+        "Mliekarka (žena s džbánom, lejúca mlieko do misy)",
+        "Dievča s perlou (žena pred čiernym pozadím, s šatkami zakrývajúcimi jej vlasy)",
+        "Kupliarka (dve ženy s mužmi pri stole s vyzdobeným obrusom)",
+        "Spiaca mladá žena (žena pri stole, vzadu pootvorené dvere)",
+        "Dievča pri okne čítajúce dopis",
+        "Alegória maliarstva (maľba z pohľadu diváka - zozadu od maliara// hlavné farby sú modrá a žltá)"
+      ]
+    }
+  },
+
+  "FLAMSKO": {
+    "RUBENS": {
+      bio: [
+        "Slávny barokový maliar, maliar šlachty",
+        "Telá v dynamických (skoro nečítateľných) kompozíciách"
+      ],
+      diela: [
+        "Venuša pred Zrkadlom (Anjel, Venuša a dievča kultúry)",
+        "Tri grácie (ženy, telá idealizované maliarom)",
+        "Únos Leukippových dcér (muži na koňoch, kradnúci ženy// mladý anjel držiaci koňa naľavo)",
+        "Klaňanie sa troch kráľov (dav ľudí, matka držiaca dieťa na ľavej časti obrazu)",
+        "Stavanie Kríža (Ježiš zavesený na kríži, nesený davom ľudí)"
+      ]
+    },
+    "VAN_DYCK": {
+      bio: [
+        "Portrétny maliar",
+        "Elegantné obliekanie postáv"
+      ],
+      diela: [
+        "Lovecký portrét Karola I (Muž v bielych šatoch pred koňom, obzerajúci sa na diváka)"
+      ]
+    }
+  },
+
+  "SPANIELSKO": {
+    "VELASQUEZ": {
+      bio: [
+        "Kreslil výhradne živé modeli",
+        "Striebristá tóny v obrazoch",
+        "Sivá-hnedá farebnosť",
+        "Odhaľuje chladnú stránku šľachty - kráľovského rodu"
+      ],
+      diela: [
+        "Pápež Inocent X (Starý pán v Bielo-červenom odeve sediaci na tróne pred červeným pozadím)",
+        "Dvorné dámy (autoportrét + maľba žien kráľovského rodu, pohľad kráľovského páru// odraz pozorovateľa v pozadí)",
+        "Venušina toaleta (Ležiaca Venuša, anjel so zrkadlom)",
+        "Infantka Margarita (Dievča v modrých, zlato ozdobených šatoch)",
+        "Pijani (Dav mužov pri kríku, muž dáva korunu z lístia inému na hlavu)"
+      ]
+    },
+    "ZURBARAN": {
+      bio: [
+        "Pobožský",
+        "Portrétny maliar významných osobností cirkevnej rehole",
+        "Častejší maliar mužských postáv",
+        "Nepoškvrnené počatie Panny Márie"
+      ],
+      diela: [
+        "Svätá Casilda (žena v medenom odeve, biely kabát pripnutý o chrbát)"
+      ]
+    },
+    "MURILLO": {
+      bio: [
+        "Náboženský, maloval námeti z detstva"
+      ],
+      diela: [
+        "Mladý Žobrák (Chlapec, rozopínajúci si odev, osvetlený zo strany otvorom okna)"
+      ]
+    }
+  },
+
+  "SLOVENSKO": {
+    "INFO": {
+      bio: [
+        "17. storočie",
+        "Trnava ako hlavné mesto baroka, neskôr Bratislava",
+        "Cudzí umelci"
+      ],
+      diela: []
+    }
+  }
+};
+
+/* ====== TERMINAL STATE ====== */
+let currentRegion = null;
+let currentArtist = null;
+
+const output = document.getElementById("output");
+const typed = document.getElementById("typed");
+const input = document.getElementById("real-input");
+const crt = document.getElementById("crt");
+
+/* ====== UTILS ====== */
+function print(lines, delay = 20) {
+  let i = 0;
+  function step() {
+    if (i < lines.length) {
+      output.textContent += lines[i] + "\n";
+      i++;
+      setTimeout(step, delay);
+    } else {
+      // Auto-scroll to bottom after printing
+      crt.scrollTop = crt.scrollHeight;
+    }
+  }
+  step();
+}
+
+function flicker() {
+  crt.classList.add("flicker");
+  setTimeout(() => crt.classList.remove("flicker"), 150);
+}
+
+/* ====== BOOT SEQUENCE ====== */
+print([
+  "BAROQUE_ARCHIVE v1.7",
+  "CRT SIGNAL LOCKED",
+  "SYNC: OK",
+  "LOADING DATA........................DONE",
+  "",
+  "TYPE HELP FOR COMMANDS",
+  ""
+], 40);
+
+/* ====== COMMAND HANDLER ====== */
+function handleCommand(cmd) {
+  const c = cmd.toUpperCase().trim();
+
+  if (c === "HELP") {
+    print([
+      "AVAILABLE COMMANDS:",
+      "LIST REGIONS",
+      "OPEN <REGION>",
+      "LIST MALIARI",
+      "OPEN <ARTIST>",
+      "BIO",
+      "DIELA",
+      "CLEAR"
+    ]);
+    return;
+  }
+
+  if (c === "LIST REGIONS") {
+    print(Object.keys(DATA));
+    return;
+  }
+
+  if (c.startsWith("OPEN ")) {
+    const name = c.slice(5).trim();
+    
+    // Check if it's a region first
+    if (DATA[name]) {
+      currentRegion = name;
+      currentArtist = null;
+      print([`REGION ${name} OPENED`, `TYPE 'LIST MALIARI' TO SEE ARTISTS`]);
+      return;
+    }
+    
+    // If we have a current region, check for artist in that region
+    if (currentRegion && DATA[currentRegion][name]) {
+      currentArtist = name;
+      print([`ARTIST ${name} LOADED`, `TYPE 'BIO' OR 'DIELA' TO VIEW INFO`]);
+      return;
+    }
+    
+    // If no current region, search all regions for the artist
+    if (!currentRegion) {
+      for (const region in DATA) {
+        if (DATA[region][name]) {
+          currentRegion = region;
+          currentArtist = name;
+          print([`FOUND IN ${region}`, `ARTIST ${name} LOADED`, `TYPE 'BIO' OR 'DIELA' TO VIEW INFO`]);
+          return;
+        }
+      }
+    }
+    
+    print(["ERROR: OBJECT NOT FOUND"]);
+    flicker();
+    return;
+  }
+
+  if (c === "LIST MALIARI") {
+    if (!currentRegion) {
+      print(["NO REGION SELECTED"]);
+      return;
+    }
+    print(Object.keys(DATA[currentRegion]));
+    return;
+  }
+
+  if (c === "BIO") {
+    if (!currentArtist) {
+      print(["NO ARTIST LOADED"]);
+      return;
+    }
+    print(DATA[currentRegion][currentArtist].bio);
+    return;
+  }
+
+  if (c === "DIELA") {
+    if (!currentArtist) {
+      print(["NO ARTIST LOADED"]);
+      return;
+    }
+    print(DATA[currentRegion][currentArtist].diela);
+    return;
+  }
+
+  if (c === "CLEAR") {
+    output.textContent = "";
+    return;
+  }
+
+  print(["UNKNOWN COMMAND"]);
+  flicker();
+}
+
+/* ====== INPUT LOOP ====== */
+input.addEventListener("input", () => {
+  typed.textContent = input.value;
+});
+
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    const cmd = input.value;
+    output.textContent += "> " + cmd + "\n";
+    input.value = "";
+    typed.textContent = "";
+    handleCommand(cmd);
+    // Scroll to bottom after command
+    setTimeout(() => crt.scrollTop = crt.scrollHeight, 50);
+  }
+});
+
+/* keep focus for phone */
+document.body.addEventListener("click", () => input.focus());
+
+/* random flicker */
+setInterval(() => {
+  if (Math.random() < 0.05) flicker();
+}, 3000);
+</script>
+</body>
+</html>
