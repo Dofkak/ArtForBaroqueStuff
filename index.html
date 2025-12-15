@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BAROQUE_ARCHIVE</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>></text></svg>">
 
@@ -43,7 +43,7 @@ html, body {
   border-radius: 30px;
   pointer-events: none;
   box-shadow: inset 0 0 80px rgba(0,0,0,0.8);
-  z-index: 1;
+  z-index: 100;
   height: 100vh;
   height: 100dvh;
 }
@@ -78,7 +78,7 @@ html, body {
     rgba(0,0,0,0) 4px
   );
   pointer-events: none;
-  z-index: 2;
+  z-index: 99;
   height: 100vh;
   height: 100dvh;
 }
@@ -108,7 +108,7 @@ html, body {
   bottom: 0;
   background: #050805;
   padding: 5px 0;
-  z-index: 20;
+  z-index: 101;
   margin-top: 10px;
 }
 
@@ -132,7 +132,7 @@ html, body {
   bottom: 0;
   left: 0;
   opacity: 0;
-  z-index: 25;
+  z-index: 102;
   width: 100%;
   height: 50px;
 }
@@ -363,6 +363,7 @@ function print(lines, delay = 15) {
       i++;
       setTimeout(step, delay);
     }
+    crt.scrollTop = crt.scrollHeight;
   }
   step();
 }
@@ -743,12 +744,6 @@ input.addEventListener("keydown", e => {
 document.body.addEventListener("click", () => {
   input.focus({ preventScroll: true });
 });
-
-// Prevent viewport jumping on mobile when keyboard appears
-const viewport = document.querySelector('meta[name="viewport"]');
-if (viewport) {
-  viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-}
 
 /* random flicker */
 setInterval(() => {
