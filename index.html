@@ -21,8 +21,10 @@ html, body {
 #crt {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
+  min-height: 100dvh; /* dynamic viewport height for mobile */
   padding: 20px;
+  padding-bottom: 80px; /* extra space for input line */
   box-sizing: border-box;
   color: #66ff99;
   text-shadow: 0 0 4px rgba(102,255,153,0.6);
@@ -40,6 +42,9 @@ html, body {
   pointer-events: none;
   box-shadow: inset 0 0 80px rgba(0,0,0,0.8);
   z-index: 10;
+  /* Fix for mobile - ensure it covers viewport properly */
+  height: 100vh;
+  height: 100dvh;
 }
 
 /* Custom scrollbar */
@@ -73,6 +78,8 @@ html, body {
   );
   pointer-events: none;
   z-index: 5;
+  height: 100vh;
+  height: 100dvh;
 }
 
 /* ====== TERMINAL ====== */
@@ -88,6 +95,8 @@ html, body {
   bottom: 0;
   background: #050805;
   padding: 5px 0;
+  z-index: 15; /* above CRT effects */
+  margin-top: 10px;
 }
 
 #prompt {
@@ -125,7 +134,7 @@ html, body {
 <div id="crt">
   <div id="output"></div>
   <div id="input-line">
-    <span id="prompt">&gt;</span>
+    <span id="prompt">PRGRM:web></span>
     <span id="typed"></span><span id="cursor">█</span>
   </div>
   <div id="scanlines"></div>
@@ -309,13 +318,23 @@ const DATA = {
 /* ====== TERMINAL STATE ====== */
 let currentRegion = null;
 let currentArtist = null;
+let currentArtpiece = null;
 
 const output = document.getElementById("output");
 const typed = document.getElementById("typed");
 const input = document.getElementById("real-input");
 const crt = document.getElementById("crt");
+const promptEl = document.getElementById("prompt");
 
 /* ====== UTILS ====== */
+function updatePrompt() {
+  let path = "PRGRM:web";
+  if (currentRegion) path += "/" + currentRegion.toLowerCase();
+  if (currentArtist) path += "/" + currentArtist.toLowerCase();
+  if (currentArtpiece) path += "/" + currentArtpiece;
+  promptEl.textContent = path + ">";
+}
+
 function print(lines, delay = 20) {
   let i = 0;
   function step() {
@@ -324,8 +343,11 @@ function print(lines, delay = 20) {
       i++;
       setTimeout(step, delay);
     } else {
-      // Auto-scroll to bottom after printing
-      crt.scrollTop = crt.scrollHeight;
+      // Scroll to show input line after printing
+      setTimeout(() => {
+        const inputLine = document.getElementById('input-line');
+        inputLine.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 50);
     }
   }
   step();
@@ -338,7 +360,7 @@ function flicker() {
 
 /* ====== BOOT SEQUENCE ====== */
 print([
-  "BAROQUE_ARCHIVE v1.7",
+  "BAROQUE_ARCHIVE v2.0",
   "CRT SIGNAL LOCKED",
   "SYNC: OK",
   "LOADING DATA........................DONE",
@@ -350,40 +372,81 @@ print([
 /* ====== COMMAND HANDLER ====== */
 function handleCommand(cmd) {
   const c = cmd.toUpperCase().trim();
+  const lower = cmd.toLowerCase().trim();
 
   if (c === "HELP") {
     print([
       "AVAILABLE COMMANDS:",
-      "LIST REGIONS",
-      "OPEN <REGION>",
-      "LIST MALIARI",
-      "OPEN <ARTIST>",
-      "BIO",
-      "DIELA",
-      "CLEAR"
+      "  REGIONS - shows all available regions",
+      "  SEARCH_SIMILAR [text] - searches for matching artists/regions",
+      "  OPEN [region/artist] - opens region or artist",
+      "  CB - clears current selection path",
+      "  BIO - shows artist biography",
+      "  DIELA - shows artist's works",
+      "  CLEAR - clears terminal screen"
     ]);
     return;
   }
 
-  if (c === "LIST REGIONS") {
-    print(Object.keys(DATA));
+  if (c === "REGIONS") {
+    print(["AVAILABLE REGIONS:", ...Object.keys(DATA).map(r => "  " + r)]);
+    return;
+  }
+
+  if (c.startsWith("SEARCH_SIMILAR ")) {
+    const query = c.slice(15).trim();
+    const results = [];
+    
+    // Search regions
+    for (const region in DATA) {
+      if (region.includes(query)) {
+        results.push(`[REGION] ${region}`);
+      }
+      
+      // Search artists
+      for (const artist in DATA[region]) {
+        if (artist.includes(query)) {
+          results.push(`[ARTIST] ${artist} (in ${region})`);
+        }
+        
+        // Search artworks
+        const works = DATA[region][artist].diela || [];
+        works.forEach(work => {
+          if (work.toUpperCase().includes(query)) {
+            results.push(`[WORK] ${work.substring(0, 50)}... (by ${artist})`);
+          }
+        });
+      }
+    }
+    
+    if (results.length === 0) {
+      print(["NO MATCHES FOUND"]);
+      flicker();
+    } else {
+      print(["SEARCH RESULTS:", ...results]);
+    }
     return;
   }
 
   if (c.startsWith("OPEN ")) {
     const name = c.slice(5).trim();
     
-    // Check if it's a region first
+    // Check if it's a region
     if (DATA[name]) {
       currentRegion = name;
       currentArtist = null;
-      print([`REGION ${name} OPENED`, `TYPE 'LIST MALIARI' TO SEE ARTISTS`]);
+      currentArtpiece = null;
+      updatePrompt();
+      const artists = Object.keys(DATA[name]);
+      print([`REGION ${name} OPENED`, `AVAILABLE ARTISTS: ${artists.join(", ")}`]);
       return;
     }
     
     // If we have a current region, check for artist in that region
     if (currentRegion && DATA[currentRegion][name]) {
       currentArtist = name;
+      currentArtpiece = null;
+      updatePrompt();
       print([`ARTIST ${name} LOADED`, `TYPE 'BIO' OR 'DIELA' TO VIEW INFO`]);
       return;
     }
@@ -394,41 +457,44 @@ function handleCommand(cmd) {
         if (DATA[region][name]) {
           currentRegion = region;
           currentArtist = name;
+          currentArtpiece = null;
+          updatePrompt();
           print([`FOUND IN ${region}`, `ARTIST ${name} LOADED`, `TYPE 'BIO' OR 'DIELA' TO VIEW INFO`]);
           return;
         }
       }
     }
     
-    print(["ERROR: OBJECT NOT FOUND"]);
+    print(["ERROR: NOT FOUND"]);
     flicker();
     return;
   }
 
-  if (c === "LIST MALIARI") {
-    if (!currentRegion) {
-      print(["NO REGION SELECTED"]);
-      return;
-    }
-    print(Object.keys(DATA[currentRegion]));
+  if (c === "CB") {
+    currentRegion = null;
+    currentArtist = null;
+    currentArtpiece = null;
+    updatePrompt();
+    print(["PATH CLEARED"]);
     return;
   }
 
   if (c === "BIO") {
     if (!currentArtist) {
-      print(["NO ARTIST LOADED"]);
+      print(["NO ARTIST LOADED - USE 'OPEN [artist]' FIRST"]);
       return;
     }
-    print(DATA[currentRegion][currentArtist].bio);
+    print([`BIO: ${currentArtist}`, ...DATA[currentRegion][currentArtist].bio]);
     return;
   }
 
   if (c === "DIELA") {
     if (!currentArtist) {
-      print(["NO ARTIST LOADED"]);
+      print(["NO ARTIST LOADED - USE 'OPEN [artist]' FIRST"]);
       return;
     }
-    print(DATA[currentRegion][currentArtist].diela);
+    const works = DATA[currentRegion][currentArtist].diela;
+    print([`WORKS BY ${currentArtist}:`, ...works.map((w, i) => `  ${i+1}. ${w}`)]);
     return;
   }
 
@@ -437,7 +503,18 @@ function handleCommand(cmd) {
     return;
   }
 
-  print(["UNKNOWN COMMAND"]);
+  // Direct region/artist name as command (shortcut for OPEN)
+  if (DATA[c]) {
+    handleCommand("OPEN " + c);
+    return;
+  }
+  
+  if (currentRegion && DATA[currentRegion][c]) {
+    handleCommand("OPEN " + c);
+    return;
+  }
+
+  print(["UNKNOWN COMMAND - TYPE 'HELP' FOR COMMANDS"]);
   flicker();
 }
 
@@ -449,17 +526,29 @@ input.addEventListener("input", () => {
 input.addEventListener("keydown", e => {
   if (e.key === "Enter") {
     const cmd = input.value;
-    output.textContent += "> " + cmd + "\n";
+    let currentPath = promptEl.textContent;
+    output.textContent += currentPath + " " + cmd + "\n";
     input.value = "";
     typed.textContent = "";
     handleCommand(cmd);
-    // Scroll to bottom after command
-    setTimeout(() => crt.scrollTop = crt.scrollHeight, 50);
+    // Ensure input line stays visible after command
+    setTimeout(() => {
+      const inputLine = document.getElementById('input-line');
+      inputLine.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 100);
   }
 });
 
-/* keep focus for phone */
-document.body.addEventListener("click", () => input.focus());
+/* keep focus for phone and prevent auto-scroll on focus */
+document.body.addEventListener("click", () => {
+  input.focus({ preventScroll: true });
+});
+
+// Prevent viewport jumping on mobile when keyboard appears
+const viewport = document.querySelector('meta[name="viewport"]');
+if (viewport) {
+  viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+}
 
 /* random flicker */
 setInterval(() => {
