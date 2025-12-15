@@ -85,9 +85,23 @@ html, body {
 
 /* ====== TERMINAL ====== */
 #output {
-  white-space: pre-wrap;
+  white-space: pre;
+  overflow-x: auto;
   line-height: 1.6;
   margin-bottom: 10px;
+}
+
+#output::-webkit-scrollbar {
+  height: 8px;
+}
+
+#output::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.3);
+}
+
+#output::-webkit-scrollbar-thumb {
+  background: #66ff99;
+  border-radius: 5px;
 }
 
 .section-header {
