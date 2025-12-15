@@ -22,9 +22,9 @@ html, body {
   position: relative;
   width: 100vw;
   min-height: 100vh;
-  min-height: 100dvh; /* dynamic viewport height for mobile */
+  min-height: 100dvh;
   padding: 20px;
-  padding-bottom: 80px; /* extra space for input line */
+  padding-bottom: 80px;
   box-sizing: border-box;
   color: #66ff99;
   text-shadow: 0 0 4px rgba(102,255,153,0.6);
@@ -42,7 +42,6 @@ html, body {
   pointer-events: none;
   box-shadow: inset 0 0 80px rgba(0,0,0,0.8);
   z-index: 10;
-  /* Fix for mobile - ensure it covers viewport properly */
   height: 100vh;
   height: 100dvh;
 }
@@ -95,7 +94,7 @@ html, body {
   bottom: 0;
   background: #050805;
   padding: 5px 0;
-  z-index: 15; /* above CRT effects */
+  z-index: 15;
   margin-top: 10px;
 }
 
@@ -223,12 +222,12 @@ const DATA = {
         "Hodina anatómie dr. Tulpa (Dav študentov - mužov, mrtvola muža na stole)",
         "Nočná hliadka (dav mužov a žien// zbrane, hudobné nástroje, dlhé tyče)",
         "Usmievajúca sa Saskia (Dáma s červeným klobúkom, bodové svetlo)",
-        "Návrat márnotratného syna (Chudý na kolenách pri Pánovi, nadprirodzený pokoj)"
+        "Návrat márnotratného syna (Chudý na kolenách pri Pánovi, nadprirodený pokoj)"
       ]
     },
     "VERMEER": {
       bio: [
-        "Zobrazoval idealizovanú, príjemnú atmosféru meštianskych interiérov"
+        "Zobrazoval idealizovanú, príjemnú atmosféru mešťianskych interiérov"
       ],
       diela: [
         "Mliekarka (žena s džbánom, lejúca mlieko do misy)",
@@ -270,7 +269,7 @@ const DATA = {
     "VELASQUEZ": {
       bio: [
         "Kreslil výhradne živé modeli",
-        "Striebristá tóny v obrazoch",
+        "Striebrištá tóny v obrazoch",
         "Sivá-hnedá farebnosť",
         "Odhaľuje chladnú stránku šľachty - kráľovského rodu"
       ],
@@ -287,7 +286,7 @@ const DATA = {
         "Pobožský",
         "Portrétny maliar významných osobností cirkevnej rehole",
         "Častejší maliar mužských postáv",
-        "Nepoškvrnené počatie Panny Márie"
+        "Nepoškvrnenné počatie Panny Márie"
       ],
       diela: [
         "Svätá Casilda (žena v medenom odeve, biely kabát pripnutý o chrbát)"
@@ -318,7 +317,8 @@ const DATA = {
 /* ====== TERMINAL STATE ====== */
 let currentRegion = null;
 let currentArtist = null;
-let currentArtpiece = null;
+let commandHistory = [];
+let historyIndex = -1;
 
 const output = document.getElementById("output");
 const typed = document.getElementById("typed");
@@ -331,7 +331,6 @@ function updatePrompt() {
   let path = "PRGRM:web";
   if (currentRegion) path += "/" + currentRegion.toLowerCase();
   if (currentArtist) path += "/" + currentArtist.toLowerCase();
-  if (currentArtpiece) path += "/" + currentArtpiece;
   promptEl.textContent = path + ">";
 }
 
@@ -342,12 +341,6 @@ function print(lines, delay = 20) {
       output.textContent += lines[i] + "\n";
       i++;
       setTimeout(step, delay);
-    } else {
-      // Scroll to show input line after printing
-      setTimeout(() => {
-        const inputLine = document.getElementById('input-line');
-        inputLine.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }, 50);
     }
   }
   step();
@@ -373,21 +366,85 @@ print([
 function handleCommand(cmd) {
   const c = cmd.toUpperCase().trim();
   const lower = cmd.toLowerCase().trim();
+  const parts = cmd.trim().split(/\s+/);
 
+  // BASIC COMMANDS
   if (c === "HELP") {
     print([
       "AVAILABLE COMMANDS:",
+      "",
+      "ARCHIVE COMMANDS:",
       "  REGIONS - shows all available regions",
       "  SEARCH_SIMILAR [text] - searches for matching artists/regions",
       "  OPEN [region/artist] - opens region or artist",
       "  CB - clears current selection path",
       "  BIO - shows artist biography",
       "  DIELA - shows artist's works",
-      "  CLEAR - clears terminal screen"
+      "",
+      "BASIC COMMANDS:",
+      "  ECHO [text] - prints text to terminal",
+      "  DATE - shows current date and time",
+      "  WHOAMI - shows current user info",
+      "  PWD - prints working directory path",
+      "  HISTORY - shows command history",
+      "  CLEAR - clears terminal screen",
+      "  EXIT - exits the system (reloads page)"
     ]);
     return;
   }
 
+  if (c === "ECHO") {
+    const text = cmd.slice(4).trim();
+    print([text || ""]);
+    return;
+  }
+
+  if (c.startsWith("ECHO ")) {
+    const text = cmd.slice(5).trim();
+    print([text]);
+    return;
+  }
+
+  if (c === "DATE") {
+    const now = new Date();
+    print([now.toString()]);
+    return;
+  }
+
+  if (c === "WHOAMI") {
+    print(["USER: baroque_researcher", "ACCESS LEVEL: full", "TERMINAL: CRT-2000"]);
+    return;
+  }
+
+  if (c === "PWD") {
+    let path = "/web";
+    if (currentRegion) path += "/" + currentRegion.toLowerCase();
+    if (currentArtist) path += "/" + currentArtist.toLowerCase();
+    print([path]);
+    return;
+  }
+
+  if (c === "HISTORY") {
+    if (commandHistory.length === 0) {
+      print(["NO COMMAND HISTORY"]);
+    } else {
+      print(["COMMAND HISTORY:", ...commandHistory.map((cmd, i) => `  ${i + 1}. ${cmd}`)]);
+    }
+    return;
+  }
+
+  if (c === "EXIT") {
+    print(["SHUTTING DOWN SYSTEM...", "CLEARING BUFFER...", "GOODBYE"], 50);
+    setTimeout(() => location.reload(), 2000);
+    return;
+  }
+
+  if (c === "CLEAR") {
+    output.textContent = "";
+    return;
+  }
+
+  // ARCHIVE COMMANDS
   if (c === "REGIONS") {
     print(["AVAILABLE REGIONS:", ...Object.keys(DATA).map(r => "  " + r)]);
     return;
@@ -435,7 +492,6 @@ function handleCommand(cmd) {
     if (DATA[name]) {
       currentRegion = name;
       currentArtist = null;
-      currentArtpiece = null;
       updatePrompt();
       const artists = Object.keys(DATA[name]);
       print([`REGION ${name} OPENED`, `AVAILABLE ARTISTS: ${artists.join(", ")}`]);
@@ -445,7 +501,6 @@ function handleCommand(cmd) {
     // If we have a current region, check for artist in that region
     if (currentRegion && DATA[currentRegion][name]) {
       currentArtist = name;
-      currentArtpiece = null;
       updatePrompt();
       print([`ARTIST ${name} LOADED`, `TYPE 'BIO' OR 'DIELA' TO VIEW INFO`]);
       return;
@@ -457,7 +512,6 @@ function handleCommand(cmd) {
         if (DATA[region][name]) {
           currentRegion = region;
           currentArtist = name;
-          currentArtpiece = null;
           updatePrompt();
           print([`FOUND IN ${region}`, `ARTIST ${name} LOADED`, `TYPE 'BIO' OR 'DIELA' TO VIEW INFO`]);
           return;
@@ -473,7 +527,6 @@ function handleCommand(cmd) {
   if (c === "CB") {
     currentRegion = null;
     currentArtist = null;
-    currentArtpiece = null;
     updatePrompt();
     print(["PATH CLEARED"]);
     return;
@@ -498,11 +551,6 @@ function handleCommand(cmd) {
     return;
   }
 
-  if (c === "CLEAR") {
-    output.textContent = "";
-    return;
-  }
-
   // Direct region/artist name as command (shortcut for OPEN)
   if (DATA[c]) {
     handleCommand("OPEN " + c);
@@ -524,18 +572,40 @@ input.addEventListener("input", () => {
 });
 
 input.addEventListener("keydown", e => {
-  if (e.key === "Enter") {
-    const cmd = input.value;
+  // Command history navigation
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (commandHistory.length > 0 && historyIndex < commandHistory.length - 1) {
+      historyIndex++;
+      const cmd = commandHistory[commandHistory.length - 1 - historyIndex];
+      input.value = cmd;
+      typed.textContent = cmd;
+    }
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (historyIndex > 0) {
+      historyIndex--;
+      const cmd = commandHistory[commandHistory.length - 1 - historyIndex];
+      input.value = cmd;
+      typed.textContent = cmd;
+    } else if (historyIndex === 0) {
+      historyIndex = -1;
+      input.value = "";
+      typed.textContent = "";
+    }
+  } else if (e.key === "Enter") {
+    const cmd = input.value.trim();
+    if (cmd) {
+      commandHistory.push(cmd);
+      historyIndex = -1;
+    }
     let currentPath = promptEl.textContent;
-    output.textContent += currentPath + " " + cmd + "\n";
+    output.textContent += currentPath + " " + input.value + "\n";
     input.value = "";
     typed.textContent = "";
-    handleCommand(cmd);
-    // Ensure input line stays visible after command
-    setTimeout(() => {
-      const inputLine = document.getElementById('input-line');
-      inputLine.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }, 100);
+    if (cmd) {
+      handleCommand(cmd);
+    }
   }
 });
 
